@@ -1,0 +1,3 @@
+C:/Users/USER/Documents/code/Uni/english-russian-dict/englorus/build/CMakeFiles/englorus.dir
+C:/Users/USER/Documents/code/Uni/english-russian-dict/englorus/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/USER/Documents/code/Uni/english-russian-dict/englorus/build/CMakeFiles/ZERO_CHECK.dir

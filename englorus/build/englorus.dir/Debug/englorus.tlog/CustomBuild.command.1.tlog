@@ -1,0 +1,10 @@
+^C:\USERS\USER\DOCUMENTS\CODE\UNI\ENGLISH-RUSSIAN-DICT\ENGLORUS\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/USER/Documents/code/Uni/english-russian-dict/englorus -BC:/Users/USER/Documents/code/Uni/english-russian-dict/englorus/build --check-stamp-file C:/Users/USER/Documents/code/Uni/english-russian-dict/englorus/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
