@@ -1,5 +1,25 @@
 #include "include/dictionary.hpp"
-#include "dictionary_node.hpp"
+#include <fstream>
+
+DictionaryTree::DictionaryTree() = default; 
+
+DictionaryTree::DictionaryTree(std::string filepath){
+    std::ifstream in;
+    in.open(filepath);
+    std::string line, key, content;
+    size_t pos;
+    if(in.is_open()){
+        while (std::getline(in, line))
+        {
+            pos = line.find(":");
+            if (pos == std::string::npos) continue;
+            key = line.substr(0, pos);
+            content = line.substr(pos + 1);
+            this->AddWord(key, content);
+        }
+    }
+    in.close();
+}
 
 void DictionaryTree::AddWord(std::string key, std::string content){
     if (root_ == nullptr) {
@@ -96,4 +116,39 @@ DictionaryNode* DictionaryTree::GetWord(const std::string& key){
         }
         else return nullptr;
     }
+}
+
+void DictionaryTree::SetWord(const std::string& key, const std::string& new_content){
+    DictionaryNode* cur = root_.get();
+    while(true){
+        if(cur == nullptr) return;
+        if(cur->getKey() < key){
+            cur = cur->getRight();
+        }
+        else if(cur->getKey() > key){
+            cur = cur->getLeft();
+        }
+        else if(cur->getKey() == key){
+            cur->setContent(new_content);
+            return;
+        }
+        else return;
+    }
+}
+
+void DictionaryTree::operator+=(const std::pair<std::string, std::string>& pair){
+    AddWord(pair.first, pair.second);
+}
+
+void DictionaryTree::operator-=(const std::string& key){
+    DeleteWord(key);
+}
+
+std::string& DictionaryTree::operator[](const std::string& key){
+    DictionaryNode* node = GetWord(key);
+    if (node == nullptr) {
+        AddWord(key, "");
+        node = GetWord(key);
+    }
+    return node->getContentChangeable();
 }

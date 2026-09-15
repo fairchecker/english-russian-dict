@@ -2,12 +2,24 @@
 
 #include <string>
 #include <memory>
+#include <fstream>
+#include <utility>
+
+#include "include/dictionary_node.hpp"
 
 class DictionaryTree {
     public:
+    DictionaryTree(std::string filepath);
+    DictionaryTree();
+
     void AddWord(std::string key, std::string content);
     void DeleteWord(const std::string& key);
     DictionaryNode* GetWord(const std::string& key);
+    void SetWord(const std::string& key, const std::string& new_content);
+
+    void operator+=(const std::pair<std::string, std::string>& pair);
+    void operator-=(const std::string& key);
+    std::string& operator[](const std::string& key);
 
     private:
     std::unique_ptr<DictionaryNode> root_;
