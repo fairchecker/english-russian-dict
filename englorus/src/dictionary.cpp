@@ -80,3 +80,20 @@ void DictionaryTree::DeleteWord(const std::string& key){
         return;
     }
 }
+
+DictionaryNode* DictionaryTree::GetWord(const std::string& key){
+    DictionaryNode* cur = root_.get();
+    while(true){
+        if(cur == nullptr) return nullptr;
+        if(cur->getKey() < key){
+            cur = cur->getRight();
+        }
+        else if(cur->getKey() > key){
+            cur = cur->getLeft();
+        }
+        else if(cur->getKey() == key){
+            return cur;
+        }
+        else return nullptr;
+    }
+}

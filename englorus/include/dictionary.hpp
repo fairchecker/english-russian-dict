@@ -7,7 +7,7 @@ class DictionaryTree {
     public:
     void AddWord(std::string key, std::string content);
     void DeleteWord(const std::string& key);
-    void GetWord(std::string key);
+    DictionaryNode* GetWord(const std::string& key);
 
     private:
     std::unique_ptr<DictionaryNode> root_;
