@@ -19,6 +19,7 @@ class DictionaryNode{
     void setRight(std::unique_ptr<DictionaryNode> node) { right_ = std::move(node); }
     void setLeft(std::unique_ptr<DictionaryNode> node) { left_ = std::move(node); }
     void setContent(std::string content) { content_ = std::move(content); }
+    void setKey(std::string key) { key_ = std::move(key)};
 
     private:
     std::string key_;
