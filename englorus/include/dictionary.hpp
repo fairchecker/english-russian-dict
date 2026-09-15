@@ -2,7 +2,6 @@
 
 #include <string>
 #include <memory>
-#include <fstream>
 #include <utility>
 
 #include "include/dictionary_node.hpp"
@@ -11,6 +10,9 @@ class DictionaryTree {
     public:
     DictionaryTree(std::string filepath);
     DictionaryTree();
+
+    DictionaryTree(const DictionaryTree& other);
+    DictionaryTree& operator=(const DictionaryTree& other);
 
     void AddWord(std::string key, std::string content);
     void DeleteWord(const std::string& key);

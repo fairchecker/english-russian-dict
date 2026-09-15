@@ -21,6 +21,28 @@ DictionaryTree::DictionaryTree(std::string filepath){
     in.close();
 }
 
+namespace {
+std::unique_ptr<DictionaryNode> copySubtree(const DictionaryNode* node) {
+    if (node == nullptr) return nullptr;
+    auto copy = std::make_unique<DictionaryNode>(node->getKey(), node->getContent());
+    copy->setLeft(copySubtree(node->getLeft()));
+    copy->setRight(copySubtree(node->getRight()));
+    return copy;
+}
+}  // namespace
+
+DictionaryTree::DictionaryTree(const DictionaryTree& other)
+    : root_(copySubtree(other.root_.get())),
+      num_words_(other.num_words_) {}
+
+DictionaryTree& DictionaryTree::operator=(const DictionaryTree& other) {
+    if (this != &other) {
+        root_ = copySubtree(other.root_.get());
+        num_words_ = other.num_words_;
+    }
+    return *this;
+}
+
 void DictionaryTree::AddWord(std::string key, std::string content){
     if (root_ == nullptr) {
     root_ = std::make_unique<DictionaryNode>(std::move(key), std::move(content));
