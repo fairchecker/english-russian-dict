@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 
-#include "include/dictionary.hpp"
+#include "dictionary.hpp"
 
 int main() {
     DictionaryTree dict;
@@ -20,7 +20,12 @@ int main() {
     dict["cat"] = "кошка";
     std::cout << "cat: " << dict["cat"] << "\n";
 
-    std::cout << "dog: " << dict.GetWord("dog")->getContent() << "\n";
+    DictionaryNode* dog = dict.GetWord("dog");
+    if (dog != nullptr) {
+        std::cout << "dog: " << dog->getContent() << "\n";
+    } else {
+        std::cout << "dog: not found\n";
+    }
 
     dict -= "world";
     if (dict.GetWord("world") == nullptr) {

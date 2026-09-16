@@ -4,7 +4,7 @@
 #include <memory>
 #include <utility>
 
-#include "include/dictionary_node.hpp"
+#include "dictionary_node.hpp"
 
 class DictionaryTree {
     public:

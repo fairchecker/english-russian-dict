@@ -1,4 +1,4 @@
-#include "include/dictionary.hpp"
+#include "dictionary.hpp"
 #include <fstream>
 
 DictionaryTree::DictionaryTree() = default; 
@@ -45,9 +45,9 @@ DictionaryTree& DictionaryTree::operator=(const DictionaryTree& other) {
 
 void DictionaryTree::AddWord(std::string key, std::string content){
     if (root_ == nullptr) {
-    root_ = std::make_unique<DictionaryNode>(std::move(key), std::move(content));
-    ++num_words_;
-    return;
+        root_ = std::make_unique<DictionaryNode>(std::move(key), std::move(content));
+        ++num_words_;
+        return;
     }
     DictionaryNode* cur = root_.get();
     while(true){

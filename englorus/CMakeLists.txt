@@ -15,7 +15,7 @@ add_executable(englorus
     src/dictionary_node.cpp
 )
 
-target_include_directories(englorus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(englorus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(englorus PRIVATE -Wall -Wextra -Wpedantic)
