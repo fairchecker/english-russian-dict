@@ -22,3 +22,21 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 elseif (MSVC)
     target_compile_options(englorus PRIVATE /W4)
 endif()
+
+enable_testing()
+
+include(FetchContent)
+FetchContent_Declare(unittest_cpp
+    GIT_REPOSITORY https://github.com/unittest-cpp/unittest-cpp.git
+    GIT_TAG v2.0.0
+)
+FetchContent_MakeAvailable(unittest_cpp)
+
+add_executable(unit_tests
+    tests/unit_tests.cpp
+    src/dictionary.cpp
+    src/dictionary_node.cpp
+)
+target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(unit_tests PRIVATE UnitTest++)
+add_test(NAME unit_tests COMMAND unit_tests)
