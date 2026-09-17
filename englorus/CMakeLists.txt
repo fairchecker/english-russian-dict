@@ -37,6 +37,9 @@ add_executable(unit_tests
     src/dictionary.cpp
     src/dictionary_node.cpp
 )
-target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(unit_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${unittest_cpp_SOURCE_DIR}/UnitTest++
+)
 target_link_libraries(unit_tests PRIVATE UnitTest++)
 add_test(NAME unit_tests COMMAND unit_tests)

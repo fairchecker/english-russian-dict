@@ -1,8 +1,17 @@
+/**
+ * @file main.cpp
+ * @brief Демонстрационная программа для англо-русского словаря.
+ */
+
 #include <iostream>
 #include <string>
 
 #include "dictionary.hpp"
 
+/**
+ * @brief Точка входа: демонстрирует основные операции словаря.
+ * @return Код возврата (0 — успех).
+ */
 int main() {
     DictionaryTree dict;
 
