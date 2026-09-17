@@ -1,22 +1,78 @@
-/[Bb]uild/
-/cmake-build-*/
+# ==========================================
+# 1. Директории сборки и артефакты CMake
+# ==========================================
+# Основная папка сборки (мы использовали 'build')
+build/
+cmake-build-*/
 
-/.idea/
-/.vscode/
-/.vs/
-
+# Файлы CMake (на случай, если случайно соберете проект в корне, а не в build/)
 CMakeCache.txt
 CMakeFiles/
-CMakeScripts/
 cmake_install.cmake
 Makefile
-targets.cmake
+compile_commands.json
 
+# Скомпилированные объектные файлы и библиотеки
 *.o
 *.obj
+*.gch
+*.pch
+
+# Исполняемые файлы и библиотеки
+*.exe
+*.out
+*.app
 *.a
 *.lib
 *.so
 *.dylib
-*.exe
-*.out
+*.dll
+
+# ==========================================
+# 2. Doxygen (Сгенерированная документация)
+# ==========================================
+# Если генерируете вручную в корне
+html/
+latex/
+# Если генерируете через CMake (цель docs)
+docs/
+
+# ==========================================
+# 3. Настройки IDE и редакторов
+# ==========================================
+# CLion / IntelliJ IDEA
+.idea/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.sln.docstates
+
+# Vim / Emacs / Nano
+*.swp
+*.swo
+*~
+tags
+
+# ==========================================
+# 4. Файлы операционных систем
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory

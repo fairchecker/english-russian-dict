@@ -1,0 +1,12 @@
+PROJECT_NAME           = "englorus"
+
+INPUT                  = include src
+
+RECURSIVE              = YES
+
+EXTRACT_ALL            = YES
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO  # Отключаем, если не нужен PDF, чтобы не ставить texlive
+
+HAVE_DOT               = YES
