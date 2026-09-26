@@ -36,7 +36,7 @@ jobs:
 
     - name: CMake configuration
       if: steps.check_cmake.outputs.has_cmake == 'true'
-      run: cmake -B ${{ matrix.folder }}/build -S ${{ matrix.folder }}
+      run: cmake -B ${{ matrix.folder }}/build -S ${{ matrix.folder }} -DBUILD_TESTING=OFF -DUNITTEST_BUILD_TESTS=OFF
 
     - name: Project build
       if: steps.check_cmake.outputs.has_cmake == 'true'
