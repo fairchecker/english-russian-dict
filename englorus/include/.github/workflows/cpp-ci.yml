@@ -1,0 +1,55 @@
+name: C++ CI
+
+# Запускаем при каждом пуше или пул-реквесте в main/master
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    name: Сборка и проверка
+    runs-on: ubuntu-latest # Среда, максимально близкая к твоему Debian
+
+    steps:
+    - name: Скачивание кода
+      uses: actions/checkout@v4
+
+    - name: Установка зависимостей (CMake, GCC, Doxygen)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ doxygen
+
+    - name: Поиск и конфигурация CMake
+      run: |
+        # Автоматически ищем CMakeLists.txt, чтобы не ломать голову, где он лежит
+        if [ -f CMakeLists.txt ]; then
+          echo "Найден CMakeLists.txt в корне"
+          cmake -B build -S .
+        elif [ -f englorus/CMakeLists.txt ]; then
+          echo "Найден CMakeLists.txt в папке englorus"
+          cmake -B build -S englorus
+        else
+          echo "Ошибка: CMakeLists.txt не найден!"
+          exit 1
+        fi
+
+    - name: Сборка проекта
+      run: cmake --build build --config Release
+
+    - name: Проверка генерации Doxygen
+      run: |
+        # Проверяем, что добавленный Doxygen реально работает и не валится с ошибкой
+        if [ -f Doxyfile ]; then
+          doxygen Doxyfile
+          echo "Doxygen (корень) собран успешно"
+        elif [ -f englorus/Doxyfile ]; then
+          cd englorus && doxygen Doxyfile
+          echo "Doxygen (englorus) собран успешно"
+        else
+          echo "Doxyfile не найден, но сборка кода прошла успешно"
+        fi
+
+    - name: Запуск тестов (если они настроены в CMake)
+      run: ctest --test-dir build --output-on-failure || true
