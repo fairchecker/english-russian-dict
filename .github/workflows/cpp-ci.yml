@@ -1,6 +1,5 @@
-name: C++ CI
+name: C++ CI (Multi-folder)
 
-# Запускаем при каждом пуше или пул-реквесте в main/master
 on:
   push:
     branches: [ "main", "master" ]
@@ -8,48 +7,51 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  build:
-    name: Сборка и проверка
-    runs-on: ubuntu-latest # Среда, максимально близкая к твоему Debian
+  build-and-test:
+    name: Checks ${{ matrix.folder }}
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        folder: [englorus, polynomial]
 
     steps:
-    - name: Скачивание кода
+    - name: Code download
       uses: actions/checkout@v4
 
-    - name: Установка зависимостей (CMake, GCC, Doxygen)
+    - name: Installing dependencies (CMake, GCC, Doxygen)
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake g++ doxygen
 
-    - name: Поиск и конфигурация CMake
+    - name: CMakeLists.txt check
+      id: check_cmake
       run: |
-        # Автоматически ищем CMakeLists.txt, чтобы не ломать голову, где он лежит
-        if [ -f CMakeLists.txt ]; then
-          echo "Найден CMakeLists.txt в корне"
-          cmake -B build -S .
-        elif [ -f englorus/CMakeLists.txt ]; then
-          echo "Найден CMakeLists.txt в папке englorus"
-          cmake -B build -S englorus
+        if [ -f "${{ matrix.folder }}/CMakeLists.txt" ]; then
+          echo "has_cmake=true" >> $GITHUB_OUTPUT
         else
-          echo "Ошибка: CMakeLists.txt не найден!"
-          exit 1
+          echo "has_cmake=false" >> $GITHUB_OUTPUT
+          echo "CMakeLists.txt not found ${{ matrix.folder }}, CMake build skipped"
         fi
 
-    - name: Сборка проекта
-      run: cmake --build build --config Release
+    - name: CMake configuration
+      if: steps.check_cmake.outputs.has_cmake == 'true'
+      run: cmake -B ${{ matrix.folder }}/build -S ${{ matrix.folder }}
 
-    - name: Проверка генерации Doxygen
+    - name: Project build
+      if: steps.check_cmake.outputs.has_cmake == 'true'
+      run: cmake --build ${{ matrix.folder }}/build --config Release
+
+    - name: Tests
+      if: steps.check_cmake.outputs.has_cmake == 'true'
+      run: ctest --test-dir ${{ matrix.folder }}/build --output-on-failure || true
+
+    - name: Doxygen generation check
       run: |
-        # Проверяем, что добавленный Doxygen реально работает и не валится с ошибкой
-        if [ -f Doxyfile ]; then
-          doxygen Doxyfile
-          echo "Doxygen (корень) собран успешно"
-        elif [ -f englorus/Doxyfile ]; then
-          cd englorus && doxygen Doxyfile
-          echo "Doxygen (englorus) собран успешно"
+        if [ -f "${{ matrix.folder }}/Doxyfile" ]; then
+          echo "Doxygen generation for ${{ matrix.folder }}..."
+          cd ${{ matrix.folder }} && doxygen Doxyfile
+          echo "Doxygen for ${{ matrix.folder }} is built succesfully"
         else
-          echo "Doxyfile не найден, но сборка кода прошла успешно"
+          echo "ℹDoxyfile not found ${{ matrix.folder }}, skipping..."
         fi
-
-    - name: Запуск тестов (если они настроены в CMake)
-      run: ctest --test-dir build --output-on-failure || true
