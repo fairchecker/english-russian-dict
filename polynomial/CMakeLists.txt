@@ -1,27 +1,33 @@
-cmake_minimum_required(VERSION 3.14)
-project(PolynomialProject VERSION 1.0)
+cmake_minimum_required(VERSION 3.21)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-include(FetchContent)
-FetchContent_Declare(
-  unittest-cpp
-  GIT_REPOSITORY https://github.com/unittest-cpp/unittest-cpp.git
-  GIT_TAG v2.0.0
-  GIT_SUBMODULES ""
-)
-FetchContent_MakeAvailable(unittest-cpp)
-
-add_library(polynomial_lib src/polynomial.cpp)
-
-target_include_directories(polynomial_lib PUBLIC 
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+project(polynomial
+    VERSION 1.0.0
+    DESCRIPTION "Polynomial class with arithmetic over real coefficients"
+    LANGUAGES CXX
 )
 
-add_executable(test_polynomial tests/unit_tests.cpp)
-target_include_directories(test_polynomial PRIVATE ${unittest-cpp_SOURCE_DIR})
-target_link_libraries(test_polynomial PRIVATE polynomial_lib UnitTest++)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../cmake")
+include(Common)
+include(Coverage)
+include(Testing)
 
 enable_testing()
-add_test(NAME PolynomialTests COMMAND test_polynomial)
+
+add_library(polynomial_lib STATIC src/polynomial.cpp)
+add_library(ppois::polynomial ALIAS polynomial_lib)
+
+target_include_directories(polynomial_lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+ppois_set_cxx_standard(polynomial_lib)
+ppois_enable_warnings(polynomial_lib)
+
+if(BUILD_TESTING)
+    ppois_setup_googletest()
+
+    add_executable(test_polynomial tests/unit_tests.cpp)
+    target_link_libraries(test_polynomial PRIVATE polynomial_lib)
+    ppois_set_cxx_standard(test_polynomial)
+    ppois_enable_warnings(test_polynomial)
+    ppois_add_googletest(test_polynomial)
+
+    ppois_enable_coverage(test_polynomial polynomial_lib src/polynomial.cpp)
+endif()

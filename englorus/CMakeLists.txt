@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.21)
 
 project(englorus
     VERSION 1.0.0
@@ -6,40 +6,39 @@ project(englorus
     LANGUAGES CXX
 )
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-add_executable(englorus
-    src/main.cpp
-    src/dictionary.cpp
-    src/dictionary_node.cpp
-)
-
-target_include_directories(englorus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(englorus PRIVATE -Wall -Wextra -Wpedantic)
-elseif (MSVC)
-    target_compile_options(englorus PRIVATE /W4)
-endif()
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../cmake")
+include(Common)
+include(Coverage)
+include(Testing)
 
 enable_testing()
 
-include(FetchContent)
-FetchContent_Declare(unittest_cpp
-    GIT_REPOSITORY https://github.com/unittest-cpp/unittest-cpp.git
-    GIT_TAG v2.0.0
-)
-FetchContent_MakeAvailable(unittest_cpp)
-
-add_executable(unit_tests
-    tests/unit_tests.cpp
+add_library(englorus_lib STATIC
     src/dictionary.cpp
     src/dictionary_node.cpp
 )
-target_include_directories(unit_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${unittest_cpp_SOURCE_DIR}/UnitTest++
-)
-target_link_libraries(unit_tests PRIVATE UnitTest++)
-add_test(NAME unit_tests COMMAND unit_tests)
+add_library(ppois::englorus ALIAS englorus_lib)
+
+target_include_directories(englorus_lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+ppois_set_cxx_standard(englorus_lib)
+ppois_enable_warnings(englorus_lib)
+
+add_executable(englorus src/main.cpp)
+target_link_libraries(englorus PRIVATE ppois::englorus)
+ppois_set_cxx_standard(englorus)
+ppois_enable_warnings(englorus)
+
+if(BUILD_TESTING)
+    ppois_setup_googletest()
+
+    add_executable(test_dictionary tests/unit_tests.cpp)
+    target_link_libraries(test_dictionary PRIVATE englorus_lib)
+    ppois_set_cxx_standard(test_dictionary)
+    ppois_enable_warnings(test_dictionary)
+    ppois_add_googletest(test_dictionary)
+
+    ppois_enable_coverage(test_dictionary englorus_lib
+        src/dictionary.cpp
+        src/dictionary_node.cpp
+    )
+endif()

@@ -1,4 +1,4 @@
-name: C++ CI (Multi-folder)
+name: C++ CI
 
 on:
   push:
@@ -6,52 +6,166 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CMAKE_BUILD_TYPE: Debug
+
 jobs:
-  build-and-test:
-    name: Checks ${{ matrix.folder }}
-    runs-on: ubuntu-latest
-    
+  # Сборка, тесты и покрытие на всех трёх ОС.
+  # Покрытие везде считается одним и тем же тулчейном (clang + llvm-cov),
+  # поэтому цифры в артефактах сопоставимы между платформами.
+  build-test-coverage:
+    name: ${{ matrix.project }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
     strategy:
+      fail-fast: false
       matrix:
-        folder: [englorus, polynomial]
+        project: [ englorus, polynomial ]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
 
     steps:
-    - name: Code download
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Installing dependencies (CMake, GCC, Doxygen)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake g++ doxygen
+      - name: Install toolchain (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm cmake ninja-build
 
-    - name: CMakeLists.txt check
-      id: check_cmake
-      run: |
-        if [ -f "${{ matrix.folder }}/CMakeLists.txt" ]; then
-          echo "has_cmake=true" >> $GITHUB_OUTPUT
-        else
-          echo "has_cmake=false" >> $GITHUB_OUTPUT
-          echo "CMakeLists.txt not found ${{ matrix.folder }}, CMake build skipped"
-        fi
+      - name: Install toolchain (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          command -v ninja > /dev/null || brew install ninja
 
-    - name: CMake configuration
-      if: steps.check_cmake.outputs.has_cmake == 'true'
-      run: cmake -B ${{ matrix.folder }}/build -S ${{ matrix.folder }} -DBUILD_TESTING=OFF -DUNITTEST_BUILD_TESTS=OFF
+      - name: Install toolchain (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # На образе windows-latest LLVM уже установлен; путь передаём
+          # явно, чтобы не зависеть от PATH.
+          LLVM_BIN="C:/Program Files/LLVM/bin"
+          test -f "$LLVM_BIN/llvm-cov.exe" || {
+            echo "::error::LLVM не найден в $LLVM_BIN"
+            exit 1
+          }
+          echo "LLVM_BIN=$LLVM_BIN" >> "$GITHUB_ENV"
+          command -v ninja > /dev/null || choco install ninja --no-progress -y
 
-    - name: Project build
-      if: steps.check_cmake.outputs.has_cmake == 'true'
-      run: cmake --build ${{ matrix.folder }}/build --config Release
+      - name: Configure
+        run: |
+          cxx="${CXX:-clang++}"
+          extra=()
+          if [ -n "${LLVM_BIN:-}" ]; then
+            cxx="$LLVM_BIN/clang++.exe"
+            # Windows: clang из LLVM.org по умолчанию целится в MinGW,
+            # явно просим MSVC-вариант фронтенда и CRT (/MD).
+            extra+=("-DCMAKE_CXX_COMPILER_FRONTEND_VARIANT=MSVC")
+            extra+=(
+              "-DPPOIS_LLVM_PROFDATA=$LLVM_BIN/llvm-profdata.exe"
+              "-DPPOIS_LLVM_COV=$LLVM_BIN/llvm-cov.exe"
+            )
+          fi
+          # ${arr[@]+...} — раскрытие пустого массива в bash 3.2 (macOS)
+          # и в bash 5 без лишнего пустого аргумента.
+          cmake -S "${{ matrix.project }}" -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
+            -DCMAKE_CXX_COMPILER="$cxx" \
+            -DCODE_COVERAGE=ON \
+            ${extra[@]+"${extra[@]}"}
 
-    - name: Tests
-      if: steps.check_cmake.outputs.has_cmake == 'true'
-      run: ctest --test-dir ${{ matrix.folder }}/build --output-on-failure || true
+      - name: Build
+        run: cmake --build build --config "$CMAKE_BUILD_TYPE" -j 2
 
-    - name: Doxygen generation check
-      run: |
-        if [ -f "${{ matrix.folder }}/Doxyfile" ]; then
-          echo "Doxygen generation for ${{ matrix.folder }}..."
-          cd ${{ matrix.folder }} && doxygen Doxyfile
-          echo "Doxygen for ${{ matrix.folder }} is built succesfully"
-        else
-          echo "ℹDoxyfile not found ${{ matrix.folder }}, skipping..."
-        fi
+      - name: Tests
+        run: ctest --test-dir build --output-on-failure -C "$CMAKE_BUILD_TYPE"
+
+      - name: Coverage
+        run: cmake --build build --target coverage --config "$CMAKE_BUILD_TYPE"
+
+      - name: Coverage summary
+        run: |
+          {
+            echo "### Покрытие: ${{ matrix.project }} / ${{ matrix.os }}"
+            echo '```'
+            cat build/coverage/report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.project }}-${{ matrix.os }}
+          path: build/coverage
+          if-no-files-found: error
+
+  # Контрольная сборка штатным компилятором MSVC: тесты должны собираться
+  # и проходить и без Clang.
+  msvc:
+    name: MSVC / ${{ matrix.project }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [ englorus, polynomial ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (Visual Studio, C++17)
+        run: |
+          cmake -S "${{ matrix.project }}" -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Debug
+
+      - name: Tests
+        run: ctest --test-dir build --output-on-failure -C Debug
+
+  # Документация Doxygen собирается только на Linux.
+  docs:
+    name: Doxygen
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [ englorus, polynomial ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      - name: Generate documentation
+        run: |
+          cd "${{ matrix.project }}"
+          doxygen Doxyfile
+          echo "Doxygen для ${{ matrix.project }} собран успешно"
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: doxygen-${{ matrix.project }}
+          path: ${{ matrix.project }}/html
+          if-no-files-found: ignore

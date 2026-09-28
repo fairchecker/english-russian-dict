@@ -1,8 +1,19 @@
-#include "UnitTest++.h"
+/**
+ * @file unit_tests.cpp
+ * @brief Юнит-тесты словаря DictionaryTree на GoogleTest.
+ *
+ * Запуск:
+ *   ctest --test-dir <build-dir> --output-on-failure
+ * или напрямую: ./test_dictionary
+ */
 
 #include "dictionary.hpp"
 
+#include <gtest/gtest.h>
+
 #include <algorithm>
+#include <cstdio>
+#include <fstream>
 #include <random>
 #include <string>
 #include <utility>
@@ -10,265 +21,446 @@
 
 namespace {
 
-void CheckInvariant(DictionaryNode* node) {
+/// Проверяет порядок ключей в поддереве (инвариант бинарного дерева поиска).
+void ExpectBstInvariant(DictionaryNode* node) {
     if (node == nullptr) return;
-    if (node->getLeft()) {
-        CHECK(node->getLeft()->getKey() < node->getKey());
-        CheckInvariant(node->getLeft());
+    if (node->getLeft() != nullptr) {
+        EXPECT_LT(node->getLeft()->getKey(), node->getKey());
+        ExpectBstInvariant(node->getLeft());
     }
-    if (node->getRight()) {
-        CHECK(node->getRight()->getKey() > node->getKey());
-        CheckInvariant(node->getRight());
+    if (node->getRight() != nullptr) {
+        EXPECT_GT(node->getRight()->getKey(), node->getKey());
+        ExpectBstInvariant(node->getRight());
     }
 }
+
+/// Создаёт временный файл словаря, возвращает его имя.
+/// Имя уникально (и без путей), поэтому тесты безопасны при ctest -j
+/// и одинаково работают на Windows и POSIX.
+class TempDictionaryFile {
+    public:
+    explicit TempDictionaryFile(const std::string& contents)
+        : path_("englorus_test_dictionary_" + std::to_string(NextId()) + ".txt") {
+        std::ofstream out(path_);
+        out << contents;
+    }
+
+    ~TempDictionaryFile() { std::remove(path_.c_str()); }
+
+    TempDictionaryFile(const TempDictionaryFile&) = delete;
+    TempDictionaryFile& operator=(const TempDictionaryFile&) = delete;
+
+    const std::string& path() const { return path_; }
+
+    private:
+    static int NextId() {
+        static int counter = 0;
+        return counter++;
+    }
+
+    std::string path_;
+};
 
 }  // namespace
 
-TEST(EmptyTree_GetWord_ReturnsNull) {
+// ===========================================================================
+// Пустое дерево
+// ===========================================================================
+TEST(EmptyTree, GetWordReturnsNull) {
     DictionaryTree dict;
-    CHECK(dict.GetWord("hello") == nullptr);
+    EXPECT_EQ(dict.GetWord("hello"), nullptr);
 }
 
-TEST(EmptyTree_DeleteWord_DoesNotCrash) {
+TEST(EmptyTree, DeleteWordDoesNotCrash) {
     DictionaryTree dict;
     dict.DeleteWord("hello");
-    CHECK(dict.GetWord("hello") == nullptr);
+    EXPECT_EQ(dict.GetWord("hello"), nullptr);
 }
 
-TEST(EmptyTree_OperatorMinus_DoesNotCrash) {
+TEST(EmptyTree, MinusEqualsDoesNotCrash) {
     DictionaryTree dict;
     dict -= "hello";
-    CHECK(dict.GetWord("hello") == nullptr);
+    EXPECT_EQ(dict.GetWord("hello"), nullptr);
 }
 
-TEST(AddSingle_GetWord_FindsKey) {
+// ===========================================================================
+// Добавление и поиск
+// ===========================================================================
+TEST(AddWord, SingleKeyIsFound) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
-    CHECK(dict.GetWord("dog") != nullptr);
+    EXPECT_NE(dict.GetWord("dog"), nullptr);
+    EXPECT_EQ("собака", dict.GetWord("dog")->getContent());
+    EXPECT_EQ("dog", dict.GetWord("dog")->getKey());
 }
 
-TEST(AddSingle_GetWord_ReturnsContent) {
-    DictionaryTree dict;
-    dict.AddWord("dog", "собака");
-    CHECK(dict.GetWord("dog")->getContent() == "собака");
-}
-
-TEST(AddSingle_RootKey) {
-    DictionaryTree dict;
-    dict.AddWord("dog", "собака");
-    CHECK(dict.GetWord("dog")->getKey() == "dog");
-}
-
-TEST(GetWord_MissingKey_ReturnsNull) {
-    DictionaryTree dict;
-    dict.AddWord("dog", "собака");
-    CHECK(dict.GetWord("horse") == nullptr);
-}
-
-TEST(GetWord_KeyNeverInserted_ReturnsNull) {
-    DictionaryTree dict;
-    dict.AddWord("cat", "кошка");
-    CHECK(dict.GetWord("zzz") == nullptr);
-}
-
-TEST(AddMany_GetWord_FindsAll) {
+TEST(AddWord, ManyKeysAreFound) {
     DictionaryTree dict;
     dict.AddWord("cat", "кошка");
     dict.AddWord("dog", "собака");
     dict.AddWord("apple", "яблоко");
     dict.AddWord("zebra", "зебра");
-    CHECK(dict.GetWord("cat") != nullptr);
-    CHECK(dict.GetWord("dog") != nullptr);
-    CHECK(dict.GetWord("apple") != nullptr);
-    CHECK(dict.GetWord("zebra") != nullptr);
+
+    for (const auto& key : {"cat", "dog", "apple", "zebra"}) {
+        ASSERT_NE(dict.GetWord(key), nullptr) << key;
+        ExpectBstInvariant(dict.GetWord(key));
+    }
+    EXPECT_EQ("яблоко", dict.GetWord("apple")->getContent());
 }
 
-TEST(DuplicateKey_UpdatesContent) {
+TEST(AddWord, MissingKeyReturnsNull) {
+    DictionaryTree dict;
+    dict.AddWord("dog", "собака");
+    EXPECT_EQ(dict.GetWord("horse"), nullptr);
+    EXPECT_EQ(dict.GetWord("zzz"), nullptr);
+}
+
+TEST(AddWord, DuplicateKeyUpdatesContent) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
     dict.AddWord("dog", "пёс");
-    CHECK(dict.GetWord("dog")->getContent() == "пёс");
-}
-
-TEST(DuplicateKey_DoesNotAddExtraNode) {
-    DictionaryTree dict;
-    dict.AddWord("dog", "собака");
-    dict.AddWord("dog", "пёс");
+    EXPECT_EQ("пёс", dict.GetWord("dog")->getContent());
+    // Лишний узел не появился: после удаления ключа дерево снова пустое.
     dict.DeleteWord("dog");
-    CHECK(dict.GetWord("dog") == nullptr);
+    EXPECT_EQ(dict.GetWord("dog"), nullptr);
 }
 
-TEST(CaseSensitiveKeys_AreDistinct) {
+TEST(AddWord, KeysAreCaseSensitive) {
     DictionaryTree dict;
     dict.AddWord("Hello", "привет");
-    dict.AddWord("hello", "привет(низ)");
-    CHECK(dict.GetWord("Hello") != nullptr);
-    CHECK(dict.GetWord("hello") != nullptr);
-    CHECK(dict.GetWord("HELLO") == nullptr);
+    dict.AddWord("hello", "привет строчными");
+    EXPECT_EQ("привет", dict.GetWord("Hello")->getContent());
+    EXPECT_EQ("привет строчными", dict.GetWord("hello")->getContent());
+    EXPECT_EQ(dict.GetWord("HELLO"), nullptr);
 }
 
-TEST(DeleteLeaf_RemovesWord) {
+// ===========================================================================
+// Удаление
+// ===========================================================================
+TEST(DeleteWord, LeafIsRemoved) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
     dict.AddWord("cat", "кошка");
     dict.DeleteWord("cat");
-    CHECK(dict.GetWord("cat") == nullptr);
+    EXPECT_EQ(dict.GetWord("cat"), nullptr);
+    EXPECT_NE(dict.GetWord("dog"), nullptr);
 }
 
-TEST(DeleteLeaf_KeepsOtherWords) {
+TEST(DeleteWord, OtherKeysSurvive) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
     dict.AddWord("cat", "кошка");
     dict.AddWord("apple", "яблоко");
     dict.DeleteWord("apple");
-    CHECK(dict.GetWord("dog") != nullptr);
-    CHECK(dict.GetWord("cat") != nullptr);
+    EXPECT_NE(dict.GetWord("dog"), nullptr);
+    EXPECT_NE(dict.GetWord("cat"), nullptr);
 }
 
-TEST(Delete_NodeWithOneLeftChild) {
+TEST(DeleteWord, NodeWithSingleLeftChild) {
     DictionaryTree dict;
-    dict.AddWord("dog", "собака");
-    dict.AddWord("cat", "кошка");
+    dict.AddWord("dog", "собака");  // корень
+    dict.AddWord("cat", "кошка");   // левый потомок
     dict.DeleteWord("dog");
-    CHECK(dict.GetWord("dog") == nullptr);
-    CHECK(dict.GetWord("cat") != nullptr);
+    EXPECT_EQ(dict.GetWord("dog"), nullptr);
+    EXPECT_EQ("кошка", dict.GetWord("cat")->getContent());
 }
 
-TEST(Delete_NodeWithOneRightChild) {
+TEST(DeleteWord, NodeWithSingleRightChild) {
     DictionaryTree dict;
-    dict.AddWord("cat", "кошка");
-    dict.AddWord("dog", "собака");
+    dict.AddWord("cat", "кошка");   // корень
+    dict.AddWord("dog", "собака");  // правый потомок
     dict.DeleteWord("cat");
-    CHECK(dict.GetWord("cat") == nullptr);
-    CHECK(dict.GetWord("dog") != nullptr);
+    EXPECT_EQ(dict.GetWord("cat"), nullptr);
+    EXPECT_EQ("собака", dict.GetWord("dog")->getContent());
 }
 
-TEST(Delete_NodeWithTwoChildren) {
+TEST(DeleteWord, NodeWithTwoChildrenReplacesWithLeftMax) {
+    // "dog" — корень, у него есть оба потомка; максимум левого поддерева — "cat".
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
     dict.AddWord("cat", "кошка");
     dict.AddWord("elephant", "слон");
     dict.DeleteWord("dog");
-    CHECK(dict.GetWord("dog") == nullptr);
-    CHECK(dict.GetWord("cat") != nullptr);
-    CHECK(dict.GetWord("elephant") != nullptr);
+    EXPECT_EQ(dict.GetWord("dog"), nullptr);
+    EXPECT_EQ("кошка", dict.GetWord("cat")->getContent());
+    EXPECT_EQ("слон", dict.GetWord("elephant")->getContent());
 }
 
-TEST(Delete_RootOnlyNode) {
+TEST(DeleteWord, TwoChildrenCaseKeepsWholeSubtree) {
+    // Удаляем корень с обоими потомками, где у левого поддерева есть
+    // собственные оба потомка: проверяем обход максимума глубже одного уровня.
+    DictionaryTree dict;
+    dict.AddWord("m", "m");
+    dict.AddWord("d", "d");
+    dict.AddWord("f", "f");
+    dict.AddWord("b", "b");
+    dict.AddWord("e", "e");
+    dict.AddWord("z", "z");
+
+    dict.DeleteWord("m");
+    EXPECT_EQ(dict.GetWord("m"), nullptr);
+    for (const auto& key : {"d", "f", "b", "e", "z"}) {
+        ASSERT_NE(dict.GetWord(key), nullptr) << key;
+        EXPECT_EQ(key, dict.GetWord(key)->getKey());
+        EXPECT_EQ(key, dict.GetWord(key)->getContent());
+    }
+    EXPECT_EQ(dict.GetWord("c"), nullptr);
+}
+
+TEST(DeleteWord, OnlyNodeInTree) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
     dict.DeleteWord("dog");
-    CHECK(dict.GetWord("dog") == nullptr);
+    EXPECT_EQ(dict.GetWord("dog"), nullptr);
 }
 
-TEST(Delete_MissingKey_TreeIntact) {
+TEST(DeleteWord, MissingKeyKeepsTreeIntact) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
     dict.AddWord("cat", "кошка");
     dict.DeleteWord("horse");
-    CHECK(dict.GetWord("dog") != nullptr);
-    CHECK(dict.GetWord("cat") != nullptr);
-    CHECK(dict.GetWord("horse") == nullptr);
+    EXPECT_NE(dict.GetWord("dog"), nullptr);
+    EXPECT_NE(dict.GetWord("cat"), nullptr);
+    EXPECT_EQ(dict.GetWord("horse"), nullptr);
 }
 
-TEST(DeleteAll_ThenGetWordNull) {
+TEST(DeleteWord, EverythingRemoved) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
     dict.AddWord("cat", "кошка");
     dict.DeleteWord("dog");
     dict.DeleteWord("cat");
-    CHECK(dict.GetWord("dog") == nullptr);
-    CHECK(dict.GetWord("cat") == nullptr);
+    EXPECT_EQ(dict.GetWord("dog"), nullptr);
+    EXPECT_EQ(dict.GetWord("cat"), nullptr);
+    // Дерево снова пустое: добавление работает как в самом начале.
+    dict.AddWord("fox", "лиса");
+    EXPECT_EQ("лиса", dict.GetWord("fox")->getContent());
 }
 
-TEST(OperatorSubscript_InsertsNewKey) {
+// ===========================================================================
+// Операторы
+// ===========================================================================
+TEST(Operators, SubscriptInsertsNewKey) {
     DictionaryTree dict;
     dict["newkey"] = "значение";
-    CHECK(dict.GetWord("newkey") != nullptr);
+    EXPECT_EQ("значение", dict.GetWord("newkey")->getContent());
 }
 
-TEST(OperatorSubscript_ModifiesExistingNodeContent) {
+TEST(Operators, SubscriptReturnsReferenceToStoredValue) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
-    auto& ref = dict["dog"];
-    ref = "пёс";
-    CHECK(dict.GetWord("dog")->getContent() == "пёс");
+    std::string& value = dict["dog"];
+    value = "пёс";
+    EXPECT_EQ("пёс", dict.GetWord("dog")->getContent());
 }
 
-TEST(OperatorSubscript_ChainedModification) {
+TEST(Operators, SubscriptInPlaceModification) {
     DictionaryTree dict;
     dict["count"] = "1";
-    dict["count"] += "!";  // modifies the stored string in place
-    CHECK(dict.GetWord("count")->getContent() == "1!");
+    dict["count"] += "!";
+    EXPECT_EQ("1!", dict.GetWord("count")->getContent());
 }
 
-TEST(OperatorPlusEq_AddsPair) {
+TEST(Operators, SubscriptOnMissingKeyCreatesEmptyValue) {
+    DictionaryTree dict;
+    std::string& value = dict["brand-new"];
+    EXPECT_EQ("", value);
+    value = "заполнено";
+    EXPECT_EQ("заполнено", dict.GetWord("brand-new")->getContent());
+}
+
+TEST(Operators, PlusEqualsAddsPair) {
     DictionaryTree dict;
     dict += std::make_pair("dog", "собака");
-    CHECK(dict.GetWord("dog") != nullptr);
-    CHECK(dict.GetWord("dog")->getContent() == "собака");
+    EXPECT_EQ("собака", dict.GetWord("dog")->getContent());
 }
 
-TEST(OperatorMinusEq_RemovesWord) {
+TEST(Operators, MinusEqualsRemovesWord) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
     dict -= "dog";
-    CHECK(dict.GetWord("dog") == nullptr);
+    EXPECT_EQ(dict.GetWord("dog"), nullptr);
 }
 
-TEST(CopyConstructor_DeepCopyKeepsOriginal) {
+TEST(SetWord, UpdatesExistingKey) {
+    DictionaryTree dict;
+    dict.AddWord("dog", "собака");
+    dict.SetWord("dog", "пёс");
+    EXPECT_EQ("пёс", dict.GetWord("dog")->getContent());
+}
+
+TEST(SetWord, MissingKeyIsNotCreated) {
+    DictionaryTree dict;
+    dict.AddWord("dog", "собака");
+    dict.SetWord("cat", "кошка");
+    EXPECT_EQ(dict.GetWord("cat"), nullptr);
+    EXPECT_EQ("собака", dict.GetWord("dog")->getContent());
+}
+
+TEST(SetWord, WorksOnEmptyTree) {
+    DictionaryTree dict;
+    dict.SetWord("dog", "собака");
+    EXPECT_EQ(dict.GetWord("dog"), nullptr);
+}
+
+// ===========================================================================
+// Копирование
+// ===========================================================================
+TEST(CopySemantics, CopyConstructorKeepsOriginalIntact) {
     DictionaryTree original;
     original.AddWord("dog", "собака");
     original.AddWord("cat", "кошка");
+
     DictionaryTree copy(original);
     copy.DeleteWord("dog");
-    CHECK(original.GetWord("dog") != nullptr);
+    copy.AddWord("fox", "лиса");
+
+    EXPECT_NE(original.GetWord("dog"), nullptr);
+    EXPECT_NE(original.GetWord("cat"), nullptr);
+    EXPECT_EQ(original.GetWord("fox"), nullptr);
 }
 
-TEST(CopyConstructor_ContentIndependent) {
+TEST(CopySemantics, CopyConstructorDeepCopiesContent) {
     DictionaryTree original;
     original.AddWord("dog", "собака");
+
     DictionaryTree copy(original);
     copy["dog"] = "пёс";
-    CHECK(original.GetWord("dog")->getContent() == "собака");
-    CHECK(copy.GetWord("dog")->getContent() == "пёс");
+
+    EXPECT_EQ("собака", original.GetWord("dog")->getContent());
+    EXPECT_EQ("пёс", copy.GetWord("dog")->getContent());
 }
 
-TEST(CopyAssignment_DeepCopy) {
+TEST(CopySemantics, AssignmentOperatorDeepCopies) {
     DictionaryTree left;
     left.AddWord("dog", "собака");
+
     DictionaryTree right;
     right.AddWord("cat", "кошка");
     right = left;
-    CHECK(right.GetWord("dog") != nullptr);
-    right.DeleteWord("dog");
-    CHECK(left.GetWord("dog") != nullptr);
+    right.AddWord("fox", "лиса");
+
+    EXPECT_EQ("собака", right.GetWord("dog")->getContent());
+    EXPECT_EQ(right.GetWord("cat"), nullptr);
+    EXPECT_EQ(left.GetWord("fox"), nullptr);
+    EXPECT_NE(right.GetWord("fox"), nullptr);
 }
 
-TEST(SelfAssignment_DoesNotCorrupt) {
+TEST(CopySemantics, SelfAssignmentDoesNotCorruptTree) {
     DictionaryTree dict;
     dict.AddWord("dog", "собака");
-    dict = dict;
-    CHECK(dict.GetWord("dog") != nullptr);
+    dict.AddWord("cat", "кошка");
+
+    // Через псевдоним: компилятор не считает это самоприсваиванием
+    // (иначе ругается -Wself-assign-overloaded), а проверить надо именно его.
+    DictionaryTree& alias = dict;
+    dict = alias;
+
+    EXPECT_EQ("собака", dict.GetWord("dog")->getContent());
+    EXPECT_EQ("кошка", dict.GetWord("cat")->getContent());
 }
 
-TEST(LargeRandomInsert_AllFoundAndInvariantHolds) {
+TEST(CopySemantics, AssigningEmptyTreeClearsTarget) {
+    DictionaryTree source;
+    DictionaryTree target;
+    target.AddWord("dog", "собака");
+
+    target = source;
+    EXPECT_EQ(target.GetWord("dog"), nullptr);
+    target.AddWord("fox", "лиса");
+    EXPECT_EQ("лиса", target.GetWord("fox")->getContent());
+    EXPECT_EQ(source.GetWord("fox"), nullptr);
+}
+
+// ===========================================================================
+// Загрузка из файла
+// ===========================================================================
+TEST(FileLoading, ReadsKeyValuePairs) {
+    TempDictionaryFile file("dog:собака\ncat:кошка\n");
+    DictionaryTree dict(file.path());
+
+    EXPECT_EQ("собака", dict.GetWord("dog")->getContent());
+    EXPECT_EQ("кошка", dict.GetWord("cat")->getContent());
+    EXPECT_EQ(dict.GetWord("horse"), nullptr);
+}
+
+TEST(FileLoading, SkipsLinesWithoutSeparator) {
+    TempDictionaryFile file("dog:собака\nпросто строка без двоеточия\ncat:кошка\n");
+    DictionaryTree dict(file.path());
+
+    EXPECT_EQ("собака", dict.GetWord("dog")->getContent());
+    EXPECT_EQ("кошка", dict.GetWord("cat")->getContent());
+    EXPECT_EQ(dict.GetWord("просто строка без двоеточия"), nullptr);
+}
+
+TEST(FileLoading, ValueMayContainColons) {
+    TempDictionaryFile file("time:12:30:00\n");
+    DictionaryTree dict(file.path());
+    EXPECT_EQ("12:30:00", dict.GetWord("time")->getContent());
+}
+
+TEST(FileLoading, MissingFileGivesEmptyDictionary) {
+    DictionaryTree dict("englorus_no_such_file.txt");
+    EXPECT_EQ(dict.GetWord("dog"), nullptr);
+    dict.AddWord("dog", "собака");
+    EXPECT_EQ("собака", dict.GetWord("dog")->getContent());
+}
+
+// ===========================================================================
+// Нагрузочный тест
+// ===========================================================================
+TEST(Stress, RandomInsertKeepsAllWordsAndInvariant) {
     DictionaryTree dict;
     std::mt19937 rng(12345);
     std::vector<std::string> keys;
-    for (int i = 0; i < 100; ++i) keys.push_back("k" + std::to_string(i));
-    std::shuffle(keys.begin(), keys.end(), rng);
-    for (const auto& k : keys) dict.AddWord(k, "v" + k);
-    int found = 0;
-    for (const auto& k : keys) {
-        DictionaryNode* n = dict.GetWord(k);
-        if (n != nullptr && n->getContent() == "v" + k) ++found;
-        CheckInvariant(n);
+    for (int i = 0; i < 100; ++i) {
+        keys.push_back("k" + std::to_string(i));
     }
-    CHECK(found == 100);
-    CHECK(dict.GetWord("missing") == nullptr);
+    std::shuffle(keys.begin(), keys.end(), rng);
+    for (const auto& key : keys) {
+        dict.AddWord(key, "v" + key);
+    }
+
+    int found = 0;
+    for (const auto& key : keys) {
+        DictionaryNode* node = dict.GetWord(key);
+        ASSERT_NE(node, nullptr) << key;
+        EXPECT_EQ("v" + key, node->getContent());
+        ++found;
+    }
+    EXPECT_EQ(static_cast<int>(keys.size()), found);
+    EXPECT_EQ(dict.GetWord("missing"), nullptr);
+
+    // Повторное добавление тех же ключей не ломает структуру.
+    for (const auto& key : keys) {
+        dict.AddWord(key, "w" + key);
+    }
+    for (const auto& key : keys) {
+        ASSERT_NE(dict.GetWord(key), nullptr) << key;
+        EXPECT_EQ("w" + key, dict.GetWord(key)->getContent());
+        ExpectBstInvariant(dict.GetWord(key));
+    }
 }
 
-int main() {
-    return UnitTest::RunAllTests();
+TEST(Stress, InterleavedInsertAndDelete) {
+    DictionaryTree dict;
+    for (int i = 0; i < 200; ++i) {
+        const std::string key = "k" + std::to_string(i);
+        dict.AddWord(key, "v" + key);
+    }
+    for (int i = 0; i < 200; i += 2) {
+        dict.DeleteWord("k" + std::to_string(i));
+    }
+    for (int i = 0; i < 200; ++i) {
+        const std::string key = "k" + std::to_string(i);
+        DictionaryNode* node = dict.GetWord(key);
+        if (i % 2 == 0) {
+            EXPECT_EQ(node, nullptr) << key;
+        } else {
+            ASSERT_NE(node, nullptr) << key;
+            EXPECT_EQ(key, node->getKey());
+            EXPECT_EQ("v" + key, node->getContent());
+        }
+        ExpectBstInvariant(node);
+    }
 }
