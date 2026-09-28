@@ -1,0 +1,26 @@
+# Doxyfile for the Polynomial project, HTML-only output.
+
+PROJECT_NAME           = "PolynomialProject"
+PROJECT_BRIEF          = "Многочлен с вещественными коэффициентами"
+
+OUTPUT_DIRECTORY       = build/docs
+INPUT                  = include src
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h *.hpp *.c *.cpp
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_EXTRA_STYLESHEET  =
+
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+GENERATE_RTF           = NO
+GENERATE_XML           = NO
+GENERATE_DOCBOOK       = NO
+
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO
