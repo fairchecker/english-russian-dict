@@ -18,7 +18,7 @@ jobs:
   # Покрытие везде считается одним и тем же тулчейном (clang + llvm-cov),
   # поэтому цифры в артефактах сопоставимы между платформами.
   build-test-coverage:
-    name: ${{ matrix.project }} / ${{ matrix.os }}
+    name: ${{ matrix.project.name }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -27,7 +27,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [ lab1/englorus, lab1/polynomial ]
+        project:    
+        - name: englorus
+          path: lab1/englorus
+        - name: polynomial
+          path: lab1/polynomial
         os: [ ubuntu-latest, macos-latest, windows-latest ]
 
     steps:
@@ -76,7 +80,7 @@ jobs:
           fi
           # ${arr[@]+...} — раскрытие пустого массива в bash 3.2 (macOS)
           # и в bash 5 без лишнего пустого аргумента.
-          cmake -S "${{ matrix.project }}" -B build -G Ninja \
+          cmake -S "${{ matrix.project.path }}" -B build -G Ninja \
             -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
             -DCMAKE_CXX_COMPILER="$cxx" \
             -DCODE_COVERAGE=ON \
@@ -94,7 +98,7 @@ jobs:
       - name: Coverage summary
         run: |
           {
-            echo "### Покрытие: ${{ matrix.project }} / ${{ matrix.os }}"
+            echo "### Покрытие: ${{ matrix.project.name }} / ${{ matrix.os }}"
             echo '```'
             cat build/coverage/report.txt
             echo '```'
@@ -103,14 +107,14 @@ jobs:
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.project }}-${{ matrix.os }}
+          name: coverage-${{ matrix.project.name }}-${{ matrix.os }}
           path: build/coverage
           if-no-files-found: error
 
   # Контрольная сборка штатным компилятором MSVC: тесты должны собираться
   # и проходить и без Clang.
   msvc:
-    name: MSVC / ${{ matrix.project }}
+    name: MSVC / ${{ matrix.project.name }}
     runs-on: windows-latest
     defaults:
       run:
@@ -119,7 +123,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [ lab1/englorus, lab1/polynomial ]
+        project:       
+        - name: englorus
+          path: lab1/englorus
+        - name: polynomial
+          path: lab1/polynomial
 
     steps:
       - name: Checkout
@@ -127,7 +135,7 @@ jobs:
 
       - name: Configure (Visual Studio, C++17)
         run: |
-          cmake -S "${{ matrix.project }}" -B build -A x64
+          cmake -S "${{ matrix.project.path }}" -B build -A x64
 
       - name: Build
         run: cmake --build build --config Debug
@@ -146,7 +154,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [ lab1/englorus, lab1/polynomial ]
+        project: 
+        - name: englorus
+          path: lab1/englorus
+        - name: polynomial
+          path: lab1/polynomial
 
     steps:
       - name: Checkout
@@ -161,11 +173,11 @@ jobs:
         run: |
           cd "${{ matrix.project }}"
           doxygen Doxyfile
-          echo "Doxygen для ${{ matrix.project }} собран успешно"
+          echo "Doxygen для ${{ matrix.project.name }} собран успешно"
 
       - name: Upload documentation
         uses: actions/upload-artifact@v4
         with:
-          name: doxygen-${{ matrix.project }}
-          path: ${{ matrix.project }}/html
+          name: doxygen-${{ matrix.project.name }}
+          path: ${{ matrix.project.path }}/html
           if-no-files-found: ignore
