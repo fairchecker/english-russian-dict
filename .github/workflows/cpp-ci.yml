@@ -119,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [ englorus, polynomial ]
+        project: [ lab1/englorus, lab1/polynomial ]
 
     steps:
       - name: Checkout
@@ -146,7 +146,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [ englorus, polynomial ]
+        project: [ lab1/englorus, lab1/polynomial ]
 
     steps:
       - name: Checkout
