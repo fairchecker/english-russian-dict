@@ -14,9 +14,7 @@ env:
   CMAKE_BUILD_TYPE: Debug
 
 jobs:
-  # Сборка, тесты и покрытие на всех трёх ОС.
-  # Покрытие везде считается одним и тем же тулчейном (clang + llvm-cov),
-  # поэтому цифры в артефактах сопоставимы между платформами.
+
   build-test-coverage:
     name: ${{ matrix.project.name }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -84,6 +82,7 @@ jobs:
             -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
             -DCMAKE_CXX_COMPILER="$cxx" \
             -DCODE_COVERAGE=ON \
+            -DPPOIS_COVERAGE_MIN_LINES=90 \
             ${extra[@]+"${extra[@]}"}
 
       - name: Build
@@ -111,8 +110,54 @@ jobs:
           path: build/coverage
           if-no-files-found: error
 
-  # Контрольная сборка штатным компилятором MSVC: тесты должны собираться
-  # и проходить и без Clang.
+  lint:
+    name: clang-tidy / ${{ matrix.project.name }}
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - name: englorus
+            path: lab1/englorus
+          - name: polynomial
+            path: lab1/polynomial
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang clang-tidy cmake ninja-build
+
+      - name: Configure
+        run: |
+          cmake -S "${{ matrix.project.path }}" \
+            -B build \
+            -G Ninja \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build
+        run: |
+          cmake --build build
+
+      - name: Run clang-tidy
+        run: |
+          find "${{ matrix.project.path }}/src" \
+            -name '*.cpp' \
+            -print0 |
+          xargs -0 clang-tidy \
+            -p build \
+            --checks='-*,bugprone-*,performance-*,modernize-*' \
+            --warnings-as-errors='*'
+
   msvc:
     name: MSVC / ${{ matrix.project.name }}
     runs-on: windows-latest
