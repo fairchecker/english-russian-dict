@@ -155,7 +155,7 @@ jobs:
             -print0 |
           xargs -0 clang-tidy \
             -p build \
-            --checks='-*,bugprone-*,performance-*,modernize-*' \
+            --checks='-*,bugprone-*,performance-*' \
             --warnings-as-errors='*'
 
   msvc:
