@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [ englorus, polynomial ]
+        project: [ lab1/englorus, lab1/polynomial ]
         os: [ ubuntu-latest, macos-latest, windows-latest ]
 
     steps:
